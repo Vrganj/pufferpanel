@@ -1,5 +1,5 @@
 <script setup>
-import { ref, inject, onMounted } from 'vue'
+import { ref, inject, onMounted, computed } from 'vue'
 import { useRoute, useRouter, onBeforeRouteLeave } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 
@@ -22,6 +22,13 @@ const events = inject('events')
 const { t } = useI18n()
 const route = useRoute()
 const router = useRouter()
+
+const activeTab = computed({
+  get: () => route.params.tab ? String(route.params.tab) : '',
+  set: (val) => {
+    router.replace({ name: route.name, params: Object.assign({}, route.params, { tab: val }), query: route.query })
+  }
+})
 
 let unmodified = `{
     "name": "",
@@ -124,7 +131,7 @@ function canSave() {
 <template>
   <div class="templatecreate">
     <div>
-      <tabs anchors>
+  <tabs v-model:active="activeTab">
         <tab id="general" :title="t('templates.General')" icon="general" hotkey="t g">
           <general v-model="template" id-editable @valid="valid.general = $event" />
         </tab>

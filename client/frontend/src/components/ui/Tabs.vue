@@ -1,5 +1,5 @@
 <script>
-import { ref, onMounted, onUnmounted, provide, nextTick } from 'vue'
+import { ref, onMounted, onUnmounted, provide, nextTick, watch } from 'vue'
 import Icon from './Icon.vue'
 
 export default {
@@ -7,9 +7,10 @@ export default {
     Icon
   },
   props: {
-    anchors: { type: Boolean, default: () => false }
+    anchors: { type: Boolean, default: () => false },
+    active: { type: String, default: () => '' }
   },
-  emits: ['tabChanged'],
+  emits: ['tabChanged', 'update:active'],
   setup(props, { slots, emit }) {
     const tabButtons = ref(null)
     const needsScroller = ref(false)
@@ -18,12 +19,16 @@ export default {
     const activeKey = ref('')
     provide('activeKey', activeKey)
 
+    // keep activeKey in sync with parent-provided `active` prop (v-model:active)
+    watch(() => props.active, (v) => {
+      if (v && v !== activeKey.value) activeKey.value = v
+    }, { immediate: true })
+
     function setActive(key) {
       activeKey.value = key
 
-      if (props.anchors) {
-        history.replaceState(history.state, '', '#' + key)
-      }
+      // Notify parent so it can decide how to represent the tab in the URL (router-driven)
+      emit('update:active', key)
 
       // deferring emit to next tick to ensure the tab content has changed
       nextTick(() => emit('tabChanged', key))
@@ -50,14 +55,15 @@ export default {
         .filter(e => e && e.props && e.props.title)
         .map(e => {
           return {
-            key: e.props.id || e.props.title.toLowercase().replace(/ /g, '-'),
+            key: e.props.id || e.props.title.toLowerCase().replace(/ /g, '-'),
             title: e.props.title,
             icon: e.props.icon,
             hotkey: e.props.hotkey
           }
         })
-
-      if (props.anchors && tabs.value.length > 0 && location.hash) {
+      // if parent provided an active prop it will be applied via the watcher above
+      // otherwise fall back to legacy hash behavior if anchors is enabled
+      if (!props.active && props.anchors && tabs.value.length > 0 && location.hash) {
         const tab = tabs.value.find(e => e.key === location.hash.substring(1))
         if (tab) setActive(tab.key)
       }

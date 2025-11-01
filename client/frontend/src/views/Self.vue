@@ -1,5 +1,6 @@
 <script setup>
-import { ref, inject, onMounted } from 'vue'
+import { ref, inject, onMounted, computed } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { updateLocale, locales } from '@/plugins/i18n'
 import Overlay from '@/components/ui/Overlay.vue'
@@ -33,6 +34,15 @@ const recoveryCodes = ref([])
 const regeneratingRecoveryCodes = ref(false)
 const token = ref('')
 const selectedLocale = ref(locale.value)
+const route = useRoute()
+const router = useRouter()
+
+const activeTab = computed({
+  get: () => route.params.tab ? String(route.params.tab) : '',
+  set: (val) => {
+    router.replace({ name: route.name, params: Object.assign({}, route.params, { tab: val }), query: route.query })
+  }
+})
 
 onMounted(async () => {
   themeSettings.value = await themeApi.getThemeSettings()
@@ -165,7 +175,7 @@ function updateThemeSetting(name, newSetting) {
     <div class="loader"><loader /></div>
   </div>
   <div v-else class="self">
-    <tabs anchors>
+  <tabs v-model:active="activeTab">
       <tab id="preferences" :title="t('users.Preferences')" icon="settings" hotkey="t s">
         <div class="preferences">
           <h1 v-text="t('users.Preferences')" />

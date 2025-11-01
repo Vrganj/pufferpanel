@@ -1,5 +1,6 @@
 <script setup>
 import { computed, ref, onMounted, onUnmounted, inject, watch } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import Btn from '@/components/ui/Btn.vue'
 import ContextMenu from '@/components/ui/ContextMenu.vue'
@@ -18,6 +19,9 @@ const toast = inject('toast')
 const props = defineProps({
   server: { type: Object, required: true }
 })
+
+const route = useRoute()
+const router = useRouter()
 
 const allowDirectoryUpload = 'webkitdirectory' in document.createElement('input')
 const canEdit = props.server.hasScope('server.files.edit')
@@ -41,6 +45,24 @@ const selection = computed(() => {
 let task
 let unbindEvent
 onMounted(() => {
+  // initialize currentPath from route param if present (decoded)
+  if (route && route.params && route.params.filePath) {
+    const p = String(route.params.filePath)
+    if (p && p.length > 0) {
+      // decode the whole param first so encoded slashes (%2F) become real
+      // separators. If decode fails (malformed percent-encoding), fall back
+      // to per-segment decode.
+      try {
+        const decoded = decodeURIComponent(p)
+        currentPath.value = decoded.split('/').filter(s => s.length > 0).map(n => ({ name: n }))
+      } catch (e) {
+        currentPath.value = p.split('/').filter(s => s.length > 0).map(n => {
+          try { return { name: decodeURIComponent(n) } } catch (_) { return { name: n } }
+        })
+      }
+    }
+  }
+
   refresh()
 
   unbindEvent = props.server.on('status', () => {
@@ -58,8 +80,34 @@ onUnmounted(async () => {
 })
 
 watch(currentPath, async (newPath) => {
-  const res = await props.server.getFile(newPath.map(e => e.name).join('/'))
+  const pathStr = newPath.map(e => e.name).join('/')
+  const res = await props.server.getFile(pathStr)
   files.value = res.sort(sortFiles)
+
+  // update route param to reflect current path (keep other params/query)
+    try {
+      if (pathStr && pathStr.length > 0) {
+        // Build explicit path string and encode each segment part. This
+        // prevents the router from double-encoding percent signs when using
+        // named route params and ensures slashes are preserved as separators.
+        const parts = []
+        for (const seg of newPath) {
+          if (!seg || !seg.name) continue
+          const sub = String(seg.name).split('/').filter(s => s.length > 0)
+          for (const s of sub) parts.push(s)
+        }
+        const encoded = parts.map(p => encodeURIComponent(p)).join('/')
+        const id = route.params.id
+        const path = encoded.length > 0 ? `/servers/view/${id}/files/${encoded}` : `/servers/view/${id}/files`
+        router.replace({ path, query: route.query })
+      } else {
+        // root — go to files root path
+        const id = route.params.id
+        router.replace({ path: `/servers/view/${id}/files`, query: route.query })
+      }
+    } catch (e) {
+      // ignore router errors
+    }
 }, {deep: true})
 
 async function refresh(manual = false) {

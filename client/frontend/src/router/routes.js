@@ -46,9 +46,16 @@ export default (api) => [
     name: 'ServerCreate'
   },
   {
-    path: '/servers/view/:id',
+    path: '/servers/view/:id/:tab?',
     component: () => import('@/views/ServerView.vue'),
-    name: 'ServerView'
+    name: 'ServerView',
+    children: [
+      {
+        path: 'files/:filePath(.*)?',
+        component: () => import('@/components/server/Files.vue'),
+        name: 'ServerFiles'
+      }
+    ]
   },
   {
     path: '/nodes',
@@ -104,12 +111,12 @@ export default (api) => [
     }
   },
   {
-    path: '/templates/new',
+    path: '/templates/new/:tab?',
     component: () => import('@/views/TemplateCreate.vue'),
     name: 'TemplateCreate'
   },
   {
-    path: '/templates/view/:repo/:id',
+    path: '/templates/view/:repo/:id/:tab?',
     component: () => import('@/views/TemplateView.vue'),
     name: 'TemplateView'
   },
@@ -125,7 +132,7 @@ export default (api) => [
     }
   },
   {
-    path: '/self',
+    path: '/self/:tab?',
     component: () => import('@/views/Self.vue'),
     name: 'Self'
   }

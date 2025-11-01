@@ -1,5 +1,5 @@
 <script setup>
-import { ref, inject, onMounted } from 'vue'
+import { ref, inject, onMounted, computed } from 'vue'
 import { useRoute, useRouter, onBeforeRouteLeave } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 
@@ -23,6 +23,13 @@ const events = inject('events')
 const { t } = useI18n()
 const route = useRoute()
 const router = useRouter()
+
+const activeTab = computed({
+  get: () => route.params.tab ? String(route.params.tab) : '',
+  set: (val) => {
+    router.replace({ name: route.name, params: Object.assign({}, route.params, { tab: val }), query: route.query })
+  }
+})
 
 let unmodified = null
 const template = ref(null)
@@ -126,7 +133,7 @@ function tabChanged(newTab) {
         <span v-text="t('templates.EditLocalOnly')" />
         <btn color="primary" @click="createLocalCopy()"><icon name="copy" />{{ t('templates.CreateLocalCopy') }}</btn>
       </div>
-      <tabs anchors @tabChanged="tabChanged">
+  <tabs v-model:active="activeTab" @tabChanged="tabChanged">
         <tab id="general" :title="t('templates.General')" icon="general" hotkey="t g">
           <general v-model="template" @valid="valid.general = $event" />
         </tab>

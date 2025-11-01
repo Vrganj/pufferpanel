@@ -1,5 +1,5 @@
 <script setup>
-import { ref, defineAsyncComponent, inject, onMounted, onUnmounted } from 'vue'
+import { ref, defineAsyncComponent, inject, onMounted, onUnmounted, computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 
@@ -17,10 +17,6 @@ const Console = defineAsyncComponent({
 })
 const Stats = defineAsyncComponent({
   loader: () => import('../server/Stats.vue'),
-  loadingComponent: Loader
-})
-const Files = defineAsyncComponent({
-  loader: () => import('../server/Files.vue'),
   loadingComponent: Loader
 })
 const Settings = defineAsyncComponent({
@@ -52,6 +48,31 @@ const { t } = useI18n()
 const events = inject('events')
 const route = useRoute()
 const router = useRouter()
+
+const activeTab = computed({
+  get: () => {
+    // If we're on the child files route, report the active tab as 'files'
+    // so the Tabs component doesn't auto-select the first tab (console)
+    // and cause an unwanted navigation.
+    if (route.name === 'ServerFiles') return 'files'
+    return route.params.tab ? String(route.params.tab) : ''
+  },
+  set: (val) => {
+    // Build explicit paths instead of relying on named params so we don't
+    // accidentally include the previous tab as a parent segment (which could
+    // produce `/console/files`). Using explicit paths ensures the URL is
+    // exactly what we expect.
+    const id = route.params.id
+    if (val === 'files') {
+      // navigate to /servers/view/:id/files
+      router.replace({ path: `/servers/view/${id}/files`, query: route.query })
+      return
+    }
+
+    // navigate to /servers/view/:id/:tab for other tabs
+    router.replace({ path: `/servers/view/${id}/${val}`, query: route.query })
+  }
+})
 const http = ref(false)
 const httpWarnDismissed = ref(false)
 let httpCount = 2
@@ -101,7 +122,7 @@ onUnmounted(() => {
   <div :class="http ? 'http-fallback' : ''">
     <server-header :key="nameUpdateHack" :server="server" />
 
-    <tabs anchors>
+  <tabs v-model:active="activeTab">
       <tab
         v-if="server.hasScope('server.console') || server.hasScope('server.console.send')"
         id="console"
@@ -131,7 +152,12 @@ onUnmounted(() => {
         icon="files"
         hotkey="t f"
       >
-        <files :server="server" />
+        <!-- Render child route for files here. Use the router-view slot to
+             pass the local `server` prop down to the routed component so it
+             still receives the same prop as before. -->
+        <router-view v-slot="{ Component }">
+          <component :is="Component" :server="server" />
+        </router-view>
       </tab>
       <tab
         v-if="server.hasScope('server.data.view') || server.hasScope('server.flags.view')"
